@@ -57,9 +57,12 @@ void maiken::Application::setup() KTHROW(kul::Exception) {
     using namespace kul::cli;
     for(const YAML::Node& c : Settings::INSTANCE().root()[STR_ENV]){
         EnvVarMode mode = EnvVarMode::PREP;
-        if      (c[STR_MODE].Scalar().compare(STR_APPEND)   == 0) mode = EnvVarMode::APPE;
-        else if (c[STR_MODE].Scalar().compare(STR_PREPEND)  == 0) mode = EnvVarMode::PREP;
-        else if (c[STR_MODE].Scalar().compare(STR_REPLACE)  == 0) mode = EnvVarMode::REPL;
+        if(c[STR_MODE]){
+            if      (c[STR_MODE].Scalar().compare(STR_APPEND)   == 0) mode = EnvVarMode::APPE;
+            else if (c[STR_MODE].Scalar().compare(STR_PREPEND)  == 0) mode = EnvVarMode::PREP;
+            else if (c[STR_MODE].Scalar().compare(STR_REPLACE)  == 0) mode = EnvVarMode::REPL;
+            else KEXIT(1, "Unhandled EnvVar mode: " + c[STR_MODE].Scalar());
+        }
         evs.emplace_back(
             c[STR_NAME].Scalar(),
             Properties::RESOLVE(*this, c[STR_VALUE].Scalar()),
