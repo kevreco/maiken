@@ -88,6 +88,5 @@ class SocketServer : public Constants, public kul::tcp::SocketServer<char>{
 };
 
 
-
 }
 #endif /* _MAIKEN_SERVER_HPP_ */

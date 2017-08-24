@@ -37,39 +37,33 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define bzero ZeroMemory
 #endif
 
-class Post : public kul::http::_1_1PostRequest{
-    public:
-        Post(
-                const std::string& host, 
-                const std::string& path = "", 
-                const uint16_t& port = 80,
-                const std::string& bdy = "")
-            : kul::http::_1_1PostRequest(host, path, port, bdy){
-        }
-        void handleResponse(const kul::hash::map::S2S& h, const std::string& b) override {
-            KUL_DBG_FUNC_ENTER
-            for(const auto& p : h)
-                KOUT(NON) << "HEADER: " << p.first << " : " << p.second;
-            KOUT(NON) << "POST RESPONSE: " << b;
-        }
-};
-
-
 int main(int argc, char* argv[]) {
     kul::Signal sig;
 
     uint8_t ret = 0;
     const int64_t s = kul::Now::MILLIS();
     try{
-        std::unique_ptr<maiken::SocketServer> serv(std::make_unique<maiken::SocketServer>(8080));
+        std::unique_ptr<kul::http::Server> serv(std::make_unique<kul::http::Server>(8080));
+        serv->withResponse([](const kul::http::A1_1Request& req) -> kul::http::_1_1Response {
+            std::istringstream iss(req.body());
+            std::stringstream ss;
+            {
+                cereal::PortableBinaryInputArchive iarchive(iss);
+                int m1, m2, m3;
+                iarchive(m1, m2, m3);
+                ss << "m1: " << m1 << " m2: " << m2 << " m3: " << m3;
+            }
+            kul::http::_1_1Response r;
+            return r.withBody(ss.str())
+                    .withDefaultHeaders();
+        });
         
         kul::Thread t([&](){
             serv->start();
         });
 
         sig.intr([&](int16_t){
-            KERR << "Interrupted";
-            
+            KERR << "Interrupted";            
             if(serv) serv->stop();
             t.join();
             exit(2);
@@ -79,24 +73,31 @@ int main(int argc, char* argv[]) {
         kul::this_thread::sleep(100);
 
         std::ostringstream ss(std::ios::out | std::ios::binary);
-
         {
             cereal::PortableBinaryOutputArchive oarchive(ss);
-
             int m1 = 112114, m2 = 112114, m3 = 112114;
             oarchive(m1, m2, m3);
         }
 
         std::string s1(ss.str());
 
-        kul::tcp::Socket<char> sock;
-        if(!sock.connect("localhost", 8080)) KEXCEPT(kul::tcp::Exception, "TCP FAILED TO CONNECT!");
-        sock.write(s1.c_str(), s1.size());
+        kul::http::_1_1PostRequest("localhost", "p", 8080)
+            .withBody(s1)
+            .withResponse([](const kul::http::_1_1Response& r){
+                for(const auto& p : r.headers())
+                    KOUT(NON) << "HEADER: " << p.first << " : " << p.second;
+                KOUT(NON) << "POST RESPONSE: " << r.body();
+            })
+            .send();
 
-        char buf[_KUL_TCP_REQUEST_BUFFER_];
-        bzero(buf, _KUL_TCP_REQUEST_BUFFER_);
-        sock.read(buf, _KUL_TCP_REQUEST_BUFFER_);
-        KLOG(INF) << buf;
+        // kul::tcp::Socket<char> sock;
+        // if(!sock.connect("localhost", 8080)) KEXCEPT(kul::tcp::Exception, "TCP FAILED TO CONNECT!");
+        // sock.write(s1.c_str(), s1.size());
+
+        // char buf[_KUL_TCP_REQUEST_BUFFER_];
+        // bzero(buf, _KUL_TCP_REQUEST_BUFFER_);
+        // sock.read(buf, _KUL_TCP_REQUEST_BUFFER_);
+        // KLOG(INF) << buf;
 
         serv->stop();
         t.join();
