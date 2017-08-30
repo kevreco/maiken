@@ -33,14 +33,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 std::unique_ptr<maiken::SocketServer> maiken::SocketServer::CREATE(int16_t argc, char *argv[]) KTHROW(kul::Exception){
     using namespace kul::cli;
 
-    std::vector<Arg> argV { 
+    std::vector<Arg> argV {
     	Arg('a', STR_ARG    , ArgType::STRING), Arg('A', STR_ADD  , ArgType::STRING),
         Arg('b', STR_BINC   , ArgType::STRING), Arg('B', STR_BPATH, ArgType::STRING),
         Arg('C', STR_DIR    , ArgType::STRING),
         Arg('d', STR_DEP    , ArgType::MAYBE) , Arg('D', STR_DEBUG),
 	};
 
-    std::vector<Cmd> cmdV { 
+    std::vector<Cmd> cmdV {
         Cmd(STR_COMPILE),  Cmd(STR_LINK),      Cmd(STR_PROFILES),
         Cmd(STR_DBG),      Cmd(STR_PACK),      Cmd(STR_INFO),
         Cmd(STR_TRIM),     Cmd(STR_TREE)

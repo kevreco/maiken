@@ -30,8 +30,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "maiken/server.hpp"
 
+#include "kul/io.hpp"
 #include "kul/log.hpp"
 #include "kul/signal.hpp"
+
+#include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 
 #ifdef _WIN32
 #define bzero ZeroMemory
@@ -42,28 +46,60 @@ int main(int argc, char* argv[]) {
 
     uint8_t ret = 0;
     const int64_t s = kul::Now::MILLIS();
+
+    char** bytes = new char*[1200];
+    for(size_t i = 0; i < 1200; i++) {
+        bytes[i] = new char[_KUL_TCP_REQUEST_BUFFER_ - 333];
+        bzero(bytes[i], _KUL_TCP_REQUEST_BUFFER_ - 333);
+    }
+
+    uint32_t bIndx = -1, bLast = 0, bUsdx = 0;
+    {
+        kul::io::BinaryReader br(kul::Dir("bin/server/obj").files()[0]);
+        size_t red = 0;
+        do{
+            bIndx++;
+            bLast = red;
+            red = br.read(bytes[bIndx], _KUL_TCP_REQUEST_BUFFER_ - 333);
+        }while(red > 0);
+    }
+
     try{
         std::unique_ptr<kul::http::Server> serv(std::make_unique<kul::http::Server>(8080));
-        serv->withResponse([](const kul::http::A1_1Request& req) -> kul::http::_1_1Response {
-            std::istringstream iss(req.body());
-            std::stringstream ss;
-            {
-                cereal::PortableBinaryInputArchive iarchive(iss);
-                int m1, m2, m3;
-                iarchive(m1, m2, m3);
-                ss << "m1: " << m1 << " m2: " << m2 << " m3: " << m3;
+        serv->withResponse([&](const kul::http::A1_1Request& req) -> kul::http::_1_1Response {
+
+            std::string s;
+
+            if(req.header("filename")){
+                if(bUsdx != bIndx)
+                    s = std::string(bytes[bUsdx++],
+                        (bUsdx == (bIndx - 1))
+                        ? bLast
+                        : _KUL_TCP_REQUEST_BUFFER_ - 333);
+
+            }else{
+                std::istringstream iss(req.body());
+                {
+                    cereal::PortableBinaryInputArchive iarchive(iss);
+                    std::string d;
+                    std::vector<std::string> args;
+                    iarchive(d, args);
+                    std::stringstream ss;
+                    ss << "app: " << d;
+                    s = ss.str();
+                }
             }
+
             kul::http::_1_1Response r;
-            return r.withBody(ss.str())
-                    .withDefaultHeaders();
+            return r.withBody(s).withDefaultHeaders();
         });
-        
+
         kul::Thread t([&](){
             serv->start();
         });
 
         sig.intr([&](int16_t){
-            KERR << "Interrupted";            
+            KERR << "Interrupted";
             if(serv) serv->stop();
             t.join();
             exit(2);
@@ -75,8 +111,9 @@ int main(int argc, char* argv[]) {
         std::ostringstream ss(std::ios::out | std::ios::binary);
         {
             cereal::PortableBinaryOutputArchive oarchive(ss);
-            int m1 = 112114, m2 = 112114, m3 = 112114;
-            oarchive(m1, m2, m3);
+            kul::Dir d(kul::env::CWD());
+            std::vector<std::string> args(argv + 1, argv + argc);
+            oarchive(d.real(), args);
         }
 
         std::string s1(ss.str());
@@ -90,14 +127,23 @@ int main(int argc, char* argv[]) {
             })
             .send();
 
-        // kul::tcp::Socket<char> sock;
-        // if(!sock.connect("localhost", 8080)) KEXCEPT(kul::tcp::Exception, "TCP FAILED TO CONNECT!");
-        // sock.write(s1.c_str(), s1.size());
+        {
+            kul::io::BinaryWriter bw(kul::Dir("bin/server/obj").files()[0].mini()+".dl");
 
-        // char buf[_KUL_TCP_REQUEST_BUFFER_];
-        // bzero(buf, _KUL_TCP_REQUEST_BUFFER_);
-        // sock.read(buf, _KUL_TCP_REQUEST_BUFFER_);
-        // KLOG(INF) << buf;
+            bool fin = 0;
+
+            kul::http::_1_1GetRequest get("localhost", "p", 8080);
+            get .withHeaders({
+                    {"binary", "true"},
+                    {"filename", "bin/server/obj/1e57d1f0d26ff2d-create.cpp.o"}
+                })
+                .withResponse([&](const kul::http::_1_1Response& r){
+                    if(r.body().size()) bw << r.body();
+                    else                fin = 1;
+                });
+
+            while(!fin) get.send();
+        }
 
         serv->stop();
         t.join();
