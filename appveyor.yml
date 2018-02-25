@@ -37,4 +37,4 @@ build_script:
   - SET MKN_CL_PREFERRED=1
 #- mkn clean build -dtKOg 0
   - C:\Python36-x64\Scripts\pip install flawfinder
-  - C:\Python36-x64\python3 -m flawfinder .
+  - C:\Python36-x64\python -m flawfinder .
