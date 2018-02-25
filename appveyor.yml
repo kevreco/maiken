@@ -31,6 +31,7 @@ cache:
   - C:\ProgramData\chocolatey\lib -> appveyor.yml
 
 build_script:
+  - SET KLOG=3
   - curl -o mkn.exe -L https://github.com/Dekken/maiken/raw/binaries/win10_msvc17_x64/mkn.exe
   - mkn clean build -dtKOg 0
   - C:\Python36-x64\Scripts\pip install flawfinder
