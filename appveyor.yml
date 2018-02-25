@@ -31,6 +31,7 @@ cache:
   - C:\ProgramData\chocolatey\lib -> appveyor.yml
 
 build_script:
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 #- curl -o mkn.exe -L https://github.com/Dekken/maiken/raw/binaries/win10_msvc17_x64/mkn.exe
   - SET KLOG=3
   - SET MKN_CL_PREFERRED=1
